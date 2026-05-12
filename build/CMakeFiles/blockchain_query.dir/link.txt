@@ -1,0 +1,1 @@
+/usr/bin/c++  -g -O0 -g CMakeFiles/blockchain_query.dir/main.cpp.o CMakeFiles/blockchain_query.dir/blockchain_client.cpp.o -o blockchain_query  /usr/lib/x86_64-linux-gnu/libcurl.so /usr/lib/x86_64-linux-gnu/libssl.so /usr/lib/x86_64-linux-gnu/libcrypto.so 
