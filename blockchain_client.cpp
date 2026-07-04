@@ -20,17 +20,19 @@ json BlockchainClient::makeRequest(const std::string &method, const json &params
     CURL *curl = curl_easy_init();
     if (!curl)
     {
+        std::cerr << "Failed to initialize CURL\n";
         throw std::runtime_error("Failed to initialize CURL");
     }
 
     // Prepare JSON-RPC payload
-    json payload = {
-        {"jsonrpc", "2.0"},
-        {"method", method},
-        {"params", params},
-        {"id", 1}};
+    json payload;
+    payload["jsonrpc"] = "2.0";
+    payload["method"] = method;
+    payload["params"] = params;
+    payload["id"] = 1;
+    JSON_DEBUG("Payload before CURL call", payload);
 
-    std::string postData = payload.dump();
+    std::string payload_str = payload.dump();
     std::string responseStr;
 
     struct curl_slist *headers = nullptr;
@@ -38,7 +40,7 @@ json BlockchainClient::makeRequest(const std::string &method, const json &params
 
     // Set CURL options
     curl_easy_setopt(curl, CURLOPT_URL, endpoint.c_str());
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postData.c_str());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload_str.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseStr);
@@ -60,6 +62,7 @@ json BlockchainClient::makeRequest(const std::string &method, const json &params
     try
     {
         auto response = json::parse(responseStr);
+        JSON_DEBUG("Response after CURL call", response);
         if (response.contains("error"))
         {
             throw std::runtime_error("RPC Error: " + response["error"].dump());
@@ -163,11 +166,12 @@ void BlockchainClient::on_open(ConnectionHandle hdl)
     std::cout << "   WebSocket connected!\n";
 
     // Subscribe to pending transactions
-    json subscribe_msg = {
-        {"jsonrpc", "2.0"},
-        {"id", 1},
-        {"method", "eth_subscribe"},
-        {"params", json::array({"newPendingTransactions"})}};
+    json subscribe_msg;
+    subscribe_msg["jsonrpc"] = "2.0";
+    subscribe_msg["id"] = 1;
+    subscribe_msg["method"] = "eth_subscribe";
+    subscribe_msg["params"] = json::array({"newPendingTransactions"});
+    JSON_DEBUG("WebSocket subscribe message", subscribe_msg);
 
     try
     {
@@ -189,6 +193,7 @@ void BlockchainClient::on_message(ConnectionHandle hdl, WSClient::message_ptr ms
     try
     {
         auto response = json::parse(msg->get_payload());
+        JSON_DEBUG("WebSocket message received", response);
 
         // Handle subscription confirmation
         if (response.contains("result"))
@@ -238,6 +243,7 @@ void BlockchainClient::onPendingTransaction(const json &tx)
         // tx is just the hash string, fetch full details
         std::string txHash = tx.get<std::string>();
         auto txData = getTransactionByHash(txHash);
+        JSON_DEBUG("Transaction data fetched", txData);
 
         std::cout << "\n   New Transaction:\n";
         std::cout << "   Hash:     " << txHash << "\n";
@@ -323,6 +329,7 @@ std::string BlockchainClient::decodeFunctionSelector(const std::string &selector
 
         // Parse response
         auto response = json::parse(responseStr);
+        JSON_DEBUG("4byte.directory response", response);
         if (response.contains("results") && response["results"].is_array() && response["results"].size() > 0)
         {
             auto results = response["results"][0];

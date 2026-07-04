@@ -5,6 +5,7 @@
 #include <thread>
 #include <memory>
 #include <curl/curl.h>
+#include <ctime>
 #include "json.hpp"
 #include "websocketpp/client.hpp"
 #include "websocketpp/config/asio_client.hpp"
@@ -63,3 +64,77 @@ public:
     // Decode function selector from 4byte.directory
     std::string decodeFunctionSelector(const std::string &selector);
 };
+
+// Debug helper function - convert hex timestamp to readable format
+inline std::string format_timestamp(const std::string &hex_timestamp)
+{
+    try
+    {
+        // Remove '0x' prefix if present
+        std::string hex = hex_timestamp;
+        if (hex.substr(0, 2) == "0x" || hex.substr(0, 2) == "0X")
+        {
+            hex = hex.substr(2);
+        }
+
+        // Convert hex to decimal (Unix timestamp)
+        uint64_t timestamp = std::stoull(hex, nullptr, 16);
+
+        // Convert to time_t for formatting
+        time_t time = static_cast<time_t>(timestamp);
+        struct tm *timeinfo = localtime(&time);
+
+        // Format as human-readable string
+        char buffer[100];
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+
+        return std::string(buffer);
+    }
+    catch (...)
+    {
+        return hex_timestamp;
+    }
+}
+
+// Debug helper function - extract and display timestamp from JSON if present (top-level or nested in result)
+inline void display_timestamp_if_present(const json &j)
+{
+    try
+    {
+        std::string ts_str;
+
+        // Check top-level timestamp
+        if (j.is_object() && j.contains("timestamp") && j["timestamp"].is_string())
+        {
+            ts_str = j["timestamp"].get<std::string>();
+        }
+        // Check nested in "result"
+        else if (j.is_object() && j.contains("result") && j["result"].is_object() &&
+                 j["result"].contains("timestamp") && j["result"]["timestamp"].is_string())
+        {
+            ts_str = j["result"]["timestamp"].get<std::string>();
+        }
+
+        if (!ts_str.empty())
+        {
+            std::string readable = format_timestamp(ts_str);
+            std::cout << "  [TIMESTAMP] " << ts_str << " = " << readable << "\n";
+        }
+        else if (j.is_object())
+        {
+            std::cout << "  [TIMESTAMP] missing timestamp\n";
+        }
+    }
+    catch (...)
+    {
+    }
+}
+
+// Debug macro for logging JSON before/after operations
+#define JSON_DEBUG(label, j)                      \
+    do                                            \
+    {                                             \
+        display_timestamp_if_present((j));        \
+        std::cout << "[DEBUG] " << label << ":\n" \
+                  << (j).dump(2) << std::endl;    \
+    } while (0)

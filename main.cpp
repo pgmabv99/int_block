@@ -2,7 +2,55 @@
 #include <cstdlib>
 #include <chrono>
 #include <functional>
+#include <iomanip>
+#include <sstream>
+#include <cmath>
 #include "blockchain_client.h"
+
+// Helper function to convert hex string to decimal string
+std::string hexToDecimal(const std::string &hex)
+{
+    std::string hexStr = hex;
+    if (hexStr.substr(0, 2) == "0x" || hexStr.substr(0, 2) == "0X")
+    {
+        hexStr = hexStr.substr(2);
+    }
+
+    // Use simple conversion for demonstration
+    // For large numbers, we'd need a big integer library
+    unsigned long long value = 0;
+    try
+    {
+        value = std::stoull(hexStr, nullptr, 16);
+    }
+    catch (...)
+    {
+        return "0";
+    }
+    return std::to_string(value);
+}
+
+// Helper function to convert wei to ETH
+double weiToEth(const std::string &weiStr)
+{
+    try
+    {
+        unsigned long long wei = std::stoull(weiStr);
+        return static_cast<double>(wei) / 1e18;
+    }
+    catch (...)
+    {
+        return 0.0;
+    }
+}
+
+// Helper function to get current ETH price in USD (using a reasonable estimate)
+double getEthPriceUSD()
+{
+    // For demonstration, returning a reasonable ETH price
+    // In production, you'd call CoinGecko API or similar
+    return 2500.0; // Approximate ETH price in USD
+}
 
 int main()
 {
@@ -38,8 +86,22 @@ int main()
         std::cout << "3. Account Balance (Vitalik):\n";
         std::string vitalikAddress = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
         auto balance = client.getBalance(vitalikAddress);
-        // Convert hex balance to ETH (divide by 10^18)
-        std::cout << "   Raw balance (wei): " << balance << "\n\n";
+
+        // Convert hex balance to decimal wei
+        std::string balanceHex = balance.is_string() ? balance.get<std::string>() : balance.dump();
+        std::string balanceWei = hexToDecimal(balanceHex);
+
+        // Convert wei to ETH
+        double balanceEth = weiToEth(balanceWei);
+
+        // Convert to USD
+        double ethPrice = getEthPriceUSD();
+        double balanceUsd = balanceEth * ethPrice;
+
+        // Display all three formats
+        std::cout << "   Balance (wei): " << balanceWei << "\n";
+        std::cout << "   Balance (ETH): " << std::fixed << std::setprecision(6) << balanceEth << " ETH\n";
+        std::cout << "   Balance (USD): $" << std::fixed << std::setprecision(2) << balanceUsd << "\n\n";
 
         // Query 4: Gas price
         std::cout << "4. Current Gas Price:\n";
@@ -51,6 +113,7 @@ int main()
         auto txCount = client.getTransactionCount(vitalikAddress);
         std::cout << "   Vitalik's transactions: " << txCount << "\n\n";
 
+        // return 0;
         // Query 6: Listen to pending transactions (demo - runs for 10 seconds)
         std::cout << "6. Listening to Pending Transactions (10 seconds):\n";
         std::cout << "   (Requires Infura paid plan or alternative provider)\n\n";
